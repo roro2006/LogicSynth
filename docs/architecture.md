@@ -6,6 +6,11 @@ the result can return to Yosys for mapping, formal checking, or another ABC
 iteration. Keeping the interchange format explicit makes experiments easy to
 inspect and keeps the optimizer independent of a particular cell library.
 
+The production-oriented core is C++17 under `include/` and `src/cpp/`, with a
+small CMake build and CTest suite. The Python implementation under `src/` is a
+reference CLI and benchmark harness; both implementations intentionally share
+the same conservative rewrite semantics.
+
 ## Analysis layer
 
 For every module, the analyzer builds a driver map and a directed cell graph.
