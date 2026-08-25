@@ -14,6 +14,12 @@ rewrite budget, input checksum, runtime, and raw JSON metrics.
 6. Store one JSON record per design under `results/`; generate tables or plots
    from those records without hand-editing values.
 
+For the checked-in smoke fixture, `make benchmark` writes
+`results/latest.json`. The Yosys integration flow is intentionally separate:
+`make yosys-test` proves that the optimized interchange file can be re-imported
+and remains equivalent, while the benchmark harness measures the structural
+proxies.
+
 The supplied harness works on an existing directory of Yosys JSON files, which
 keeps CI offline and avoids silently changing a benchmark when an upstream
 repository moves. Public benchmark acquisition belongs in a pinned manifest
