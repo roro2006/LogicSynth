@@ -12,5 +12,5 @@ python3 - <<'PY'
 import json
 with open("build/yosys-test/report.json") as handle:
     report = json.load(handle)
-assert report["modules"]["top"]["rewrites"] >= 1
+assert report["modules"]["top"]["rewrites"] >= 1, report
 PY

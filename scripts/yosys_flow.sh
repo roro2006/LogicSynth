@@ -11,7 +11,7 @@ command -v yosys >/dev/null 2>&1 || {
   exit 2
 }
 mkdir -p "$out_dir"
-yosys -q -p "read_verilog $input; hierarchy -top $top; proc; opt; write_json $out_dir/baseline.json"
+yosys -q -p "read_verilog $input; hierarchy -top $top; proc; write_json $out_dir/baseline.json"
 PYTHONPATH="${PYTHONPATH:-src}" python3 scripts/optimize_netlist.py \
   --input "$out_dir/baseline.json" \
   --output "$out_dir/optimized.json" \
