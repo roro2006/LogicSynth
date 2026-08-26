@@ -57,6 +57,10 @@ implements the same deterministic duplicate-cone rewrite and structural
 metrics. The next integration step is a Yosys JSON adapter or native Yosys
 plugin, depending on the target deployment.
 
+The C++ rewrite loop evaluates each candidate against the selected profile's
+weighted area/depth/power objective. A rewrite is committed only when that
+objective does not regress; the report exposes before/after objective values.
+
 ## Yosys integration test
 
 With Yosys installed, the complete flow can be exercised using the checked-in

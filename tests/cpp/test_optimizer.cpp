@@ -14,4 +14,5 @@ int main() {
   assert(module.cells.size() == 1);
   assert(module.ports["y"][0] == 4);
   assert(report.metrics.area_proxy == 1);
+  assert(report.objective_after < report.objective_before);
 }

@@ -90,10 +90,19 @@ Metrics analyze(const Module &module) {
   return metrics;
 }
 
-Report optimize(Module &module, const Profile &, std::size_t max_rewrites) {
+double objective(const Metrics &metrics, const Profile &profile) {
+  return profile.area_weight * static_cast<double>(metrics.area_proxy) +
+         profile.delay_weight * static_cast<double>(metrics.max_depth) +
+         profile.power_weight * static_cast<double>(metrics.power_proxy);
+}
+
+Report optimize(Module &module, const Profile &profile,
+                std::size_t max_rewrites) {
   std::map<std::string, std::string> canonical;
   std::map<int, int> replacements;
   Report report;
+  const auto initial_metrics = analyze(module);
+  report.objective_before = objective(initial_metrics, profile);
   for (auto it = module.cells.begin(); it != module.cells.end() &&
                                      report.rewrites < max_rewrites;) {
     Cell &cell = it->second;
@@ -112,6 +121,30 @@ Report optimize(Module &module, const Profile &, std::size_t max_rewrites) {
     auto *new_output = output(module.cells.at(prior->second));
     if (old_output != nullptr && new_output != nullptr &&
         old_output->size() == new_output->size()) {
+      Module candidate = module;
+      auto candidate_cell = candidate.cells.find(it->first);
+      auto candidate_canonical = candidate.cells.find(prior->second);
+      auto *candidate_old = output(candidate_cell->second);
+      auto *candidate_new = output(candidate_canonical->second);
+      std::map<int, int> candidate_replacements;
+      for (std::size_t i = 0; i < candidate_old->size(); ++i)
+        candidate_replacements[(*candidate_old)[i]] = (*candidate_new)[i];
+      candidate.cells.erase(candidate_cell);
+      for (auto &entry : candidate.cells)
+        for (auto &port : entry.second.connections)
+          for (int &bit : port.second)
+            if (candidate_replacements.count(bit)) bit = candidate_replacements[bit];
+      for (auto &entry : candidate.ports)
+        for (int &bit : entry.second)
+          if (candidate_replacements.count(bit)) bit = candidate_replacements[bit];
+      for (auto &entry : candidate.netnames)
+        for (int &bit : entry.second)
+          if (candidate_replacements.count(bit)) bit = candidate_replacements[bit];
+      if (objective(analyze(candidate), profile) >
+          objective(analyze(module), profile)) {
+        ++it;
+        continue;
+      }
       for (std::size_t i = 0; i < old_output->size(); ++i)
         replacements[(*old_output)[i]] = (*new_output)[i];
       it = module.cells.erase(it);
@@ -131,6 +164,7 @@ Report optimize(Module &module, const Profile &, std::size_t max_rewrites) {
     for (int &bit : entry.second)
       if (replacements.count(bit)) bit = replacements[bit];
   report.metrics = analyze(module);
+  report.objective_after = objective(report.metrics, profile);
   return report;
 }
 
