@@ -1,0 +1,25 @@
+# Native Yosys pass
+
+`passes/logicsynth.cc` is a Yosys plugin adapter. It uses RTLIL signals
+directly, so the pass can share identical `$and`, `$or`, `$xor`, `$xnor`, `$not`,
+`$mux`, and mapped AND/OR cells without serializing through JSON.
+
+Build it with:
+
+```bash
+sudo apt-get install yosys yosys-dev
+make yosys-plugin
+```
+
+The CI smoke test runs the pass before Yosys's regular optimization passes so
+the fixture contains two duplicate `$and` cells:
+
+```bash
+make yosys-plugin-test
+```
+
+The plugin accepts `-max_rewrites N` and visits selected modules in deterministic
+cell-map order. It excludes sequential and unknown cell types. Formal
+equivalence remains the acceptance gate; use the JSON flow and
+`scripts/equivalence.sh` for a complete automated check while native-pass
+coverage is expanded.

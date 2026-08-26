@@ -75,6 +75,18 @@ imports the optimized JSON, emits Verilog, and runs Yosys formal equivalence.
 CI installs a pinned Ubuntu-package Yosys dependency and executes this flow on
 every push and pull request.
 
+When the Yosys development package is installed, the same rewrite is available
+as a native pass:
+
+```bash
+make yosys-plugin
+yosys -m ./build/logicsynth.so -p 'read_verilog design.v; prep -top top; logicsynth; write_verilog optimized.v'
+```
+
+The plugin is intentionally conservative and currently implements duplicate
+combinational-cone sharing. It is the first native integration point for
+bringing the C++ implementation into the Yosys pass pipeline.
+
 The optimizer currently targets combinational `$logic` cells and preserves
 unknown cells and sequential behavior. Run `scripts/equivalence.sh` with Yosys
 installed to compare the original and optimized Verilog.
