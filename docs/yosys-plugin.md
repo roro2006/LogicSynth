@@ -18,8 +18,10 @@ the fixture contains two duplicate `$and` cells:
 make yosys-plugin-test
 ```
 
-The plugin accepts `-max_rewrites N` and visits selected modules in deterministic
-cell-map order. It excludes sequential and unknown cell types. Formal
+The plugin accepts `-profile balanced|area|timing|power`, explicit
+`-area_weight`, `-delay_weight`, and `-power_weight` overrides, plus
+`-max_rewrites N`. It visits selected modules in deterministic cell-map order.
+It excludes sequential and unknown cell types. Formal
 equivalence remains the acceptance gate; use the JSON flow and
 `scripts/equivalence.sh` for a complete automated check while native-pass
 coverage is expanded.
