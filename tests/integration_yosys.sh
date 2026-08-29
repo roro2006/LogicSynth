@@ -8,9 +8,4 @@ fi
 
 rm -rf build/yosys-test
 scripts/yosys_flow.sh tests/data/duplicate_cone.v top build/yosys-test
-python3 - <<'PY'
-import json
-with open("build/yosys-test/report.json") as handle:
-    report = json.load(handle)
-assert report["modules"]["top"]["rewrites"] >= 1, report
-PY
+grep -q "duplicate cones shared" build/yosys-test/optimization.log

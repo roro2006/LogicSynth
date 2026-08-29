@@ -1,6 +1,7 @@
 # LogicSynth
 
-LogicSynth is a small, deterministic optimization pass for Yosys JSON netlists. It
+LogicSynth is a small, deterministic C++ optimization pass for Yosys RTLIL
+netlists. It
 is designed as a transparent research baseline: unlike a black-box commercial
 optimizer, every rewrite is inspectable, configurable, and measurable.
 
@@ -12,40 +13,21 @@ flow and checked with formal equivalence.
 ## Quickstart
 
 ```bash
-python3 -m pip install -e '.[test]'
-python3 -m logicsynth.cli --help
-python3 scripts/optimize_netlist.py \
-  --input tests/data/tiny.json \
-  --output /tmp/tiny.optimized.json \
-  --profile balanced
-python3 -m pytest
+make test
+make yosys-test
 ```
 
-For a Yosys flow, export a JSON netlist, optimize it, and import it again:
-
-```yosys
-read_verilog design.v
-hierarchy -top top
-proc; opt; abc -g simple
-write_json build/baseline.json
-```
+For a Yosys flow, build and invoke the native pass directly:
 
 ```bash
-python3 scripts/optimize_netlist.py \
-  --input build/baseline.json --output build/optimized.json
-```
-
-```yosys
-read_json build/optimized.json
-write_verilog -noattr build/optimized.v
+make yosys-plugin
+yosys -m ./build/logicsynth.so \
+  -p 'read_verilog design.v; prep -top top; logicsynth -profile balanced; write_verilog optimized.v'
 ```
 
 ## C++ core
 
-The optimization engine is also available as a C++17 library. This is the
-preferred path for production integration and eventual native Yosys pass
-packaging; the Python implementation remains useful as a reference and
-benchmark driver while the interchange layer is expanded.
+The optimization engine is a C++17 library and native Yosys plugin.
 
 ```bash
 make test
@@ -53,9 +35,7 @@ make test
 ```
 
 The current C++ core models Yosys-style cells, ports, and bit connections and
-implements the same deterministic duplicate-cone rewrite and structural
-metrics. The next integration step is a Yosys JSON adapter or native Yosys
-plugin, depending on the target deployment.
+implements deterministic duplicate-cone rewrite and structural metrics.
 
 The C++ rewrite loop evaluates each candidate against the selected profile's
 weighted area/depth/power objective. A rewrite is committed only when that
@@ -87,11 +67,7 @@ The plugin is intentionally conservative and currently implements duplicate
 combinational-cone sharing. It is the first native integration point for
 bringing the C++ implementation into the Yosys pass pipeline.
 
-Python is not the production pass. It remains in the repository as a small
-reference implementation for JSON experiments and the benchmark harness.
-Production Yosys integration is C++ through `passes/logicsynth.cc`; `make test`
-keeps both implementations covered so the reference path cannot silently
-diverge from the native path.
+Production Yosys integration is C++ through `passes/logicsynth.cc`.
 
 The optimizer currently targets combinational `$logic` cells and preserves
 unknown cells and sequential behavior. Run `scripts/equivalence.sh` with Yosys
