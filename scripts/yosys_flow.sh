@@ -12,7 +12,7 @@ command -v yosys >/dev/null 2>&1 || {
 }
 mkdir -p "$out_dir"
 make yosys-plugin
-yosys -q -m ./build/logicsynth.so \
+yosys -m ./build/logicsynth.so \
   -p "read_verilog $input; hierarchy -top $top; proc; logicsynth -profile $profile; stat; write_verilog -noattr $out_dir/optimized.v" \
   > "$out_dir/optimization.log"
 "$(dirname "$0")/equivalence.sh" "$input" "$out_dir/optimized.v" "$top"
