@@ -7,8 +7,17 @@
  */
 #include "kernel/yosys.h"
 
+#include <cmath>
+#include <map>
+
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
+
+struct Metrics {
+  size_t logic_cells = 0;
+  size_t max_depth = 0;
+  size_t fanout_proxy = 0;
+};
 
 struct LogicSynthPass : public Pass {
   LogicSynthPass() : Pass("logicsynth", "share identical combinational cones") {}
@@ -55,13 +64,16 @@ struct LogicSynthPass : public Pass {
       } else {
         log_error("Unknown option: %s\n", args[arg].c_str());
       }
-      log("  profile=%s area_weight=%.3f delay_weight=%.3f power_weight=%.3f max_rewrites=%zu\n",
-          profile.c_str(), area_weight, delay_weight, power_weight, max_rewrites);
     }
+    log("  profile=%s area_weight=%.3f delay_weight=%.3f power_weight=%.3f max_rewrites=%zu\n",
+        profile.c_str(), area_weight, delay_weight, power_weight, max_rewrites);
 
     for (auto *module : design->selected_modules()) {
       dict<std::string, RTLIL::Cell *> canonical;
       size_t rewrites = 0;
+      size_t rejected = 0;
+      const auto before = metrics(module);
+      const double objective_before = objective(before, area_weight, delay_weight, power_weight);
       for (auto it = module->cells_.begin();
            it != module->cells_.end() && rewrites < max_rewrites;) {
         RTLIL::Cell *cell = it->second;
@@ -101,16 +113,60 @@ struct LogicSynthPass : public Pass {
           ++it;
           continue;
         }
+        const auto after = candidate_metrics(module, cell);
+        const double objective_after = objective(after, area_weight, delay_weight, power_weight);
+        if (objective_after > objective_before) {
+          ++rejected;
+          ++it;
+          continue;
+        }
         module->connect(output, canonical_output);
         module->remove(cell);
         it = module->cells_.begin();
         ++rewrites;
       }
-      log("  %s: %zu duplicate cones shared.\n", log_id(module), rewrites);
+      const auto final_metrics = metrics(module);
+      log("  %s: rewrites=%zu rejected=%zu area=%zu depth=%zu power_proxy=%zu objective_before=%.3f objective_after=%.3f\n",
+          log_id(module), rewrites, rejected, final_metrics.logic_cells,
+          final_metrics.max_depth, final_metrics.fanout_proxy,
+          objective_before, objective(final_metrics, area_weight, delay_weight, power_weight));
     }
   }
 
 private:
+  static Metrics metrics(RTLIL::Module *module) {
+    Metrics result;
+    std::map<std::string, size_t> fanout;
+    for (const auto &entry : module->cells_) {
+      if (is_logic(entry.second->type))
+        ++result.logic_cells;
+      for (const auto &connection : entry.second->connections()) {
+        if (connection.first == ID::Y || connection.first == ID::Q)
+          continue;
+        fanout[connection.second.as_string()]++;
+      }
+    }
+    result.max_depth = result.logic_cells;
+    for (const auto &entry : fanout)
+      result.fanout_proxy += entry.second * entry.second;
+    return result;
+  }
+
+  static Metrics candidate_metrics(RTLIL::Module *module, RTLIL::Cell *removed) {
+    Metrics result = metrics(module);
+    if (is_logic(removed->type) && result.logic_cells > 0)
+      --result.logic_cells;
+    result.max_depth = result.logic_cells;
+    return result;
+  }
+
+  static double objective(const Metrics &metrics, double area_weight,
+                          double delay_weight, double power_weight) {
+    return area_weight * metrics.logic_cells +
+           delay_weight * metrics.max_depth +
+           power_weight * metrics.fanout_proxy;
+  }
+
   static bool is_logic(const RTLIL::IdString &type) {
     const auto name = type.str();
     return name == "$and" || name == "$or" || name == "$xor" ||

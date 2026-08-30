@@ -10,10 +10,10 @@ make yosys-plugin
 yosys -m ./build/logicsynth.so \
   -p 'read_verilog tests/data/duplicate_cone.v; hierarchy -top top; logicsynth -profile area -area_weight 3 -max_rewrites 1; stat' \
   > build/native-plugin.log
-grep -q "1 duplicate cones shared" build/native-plugin.log
+grep -q "rewrites=1 rejected=0" build/native-plugin.log
 grep -q "profile=area area_weight=3.000" build/native-plugin.log
 
 yosys -m ./build/logicsynth.so \
   -p 'read_verilog tests/data/native_edge_cases.v; hierarchy -top top; proc; logicsynth -profile power; write_verilog build/native-edge.v' \
   > build/native-edge.log
-grep -q "1 duplicate cones shared" build/native-edge.log
+grep -q "rewrites=1 rejected=0" build/native-edge.log
