@@ -28,3 +28,7 @@ candidates. Formal equivalence remains the acceptance gate; use
 
 The native smoke suite also covers constant identities such as `x & 1`,
 `x | 0`, and `x ^ 0`, then proves the emitted Verilog equivalent to the input.
+
+Commutative cone canonicalization sorts the operand signatures for AND, OR,
+XOR, and XNOR families. Thus `a & b` and `b & a` can share a representative
+even when the source netlist uses different input ordering.
