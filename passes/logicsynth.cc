@@ -208,8 +208,8 @@ private:
     if (type == "$or" && b_const && !b_value) { replacement = a; return true; }
     if (type == "$xor" && a_const && !a_value) { replacement = b; return true; }
     if (type == "$xor" && b_const && !b_value) { replacement = a; return true; }
-    if (type == "$xnor" && a_const && !a_value) { replacement = b; return true; }
-    if (type == "$xnor" && b_const && !b_value) { replacement = a; return true; }
+    if (type == "$xnor" && a_const && a_value) { replacement = b; return true; }
+    if (type == "$xnor" && b_const && b_value) { replacement = a; return true; }
     return false;
   }
 
