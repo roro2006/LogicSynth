@@ -1,0 +1,20 @@
+{
+  "design": "commutative_cones.v",
+  "tool": "LogicSynth native Yosys pass",
+  "yosys_version": "0.33",
+  "equivalence": "passed",
+  "baseline": {
+    "num_cells": 2,
+    "num_cells_by_type": {"$and": 2}
+  },
+  "abc": {
+    "num_cells": 1,
+    "num_cells_by_type": {"$and": 1}
+  },
+  "logicsynth": {
+    "num_cells": 1,
+    "num_cells_by_type": {"$and": 1},
+    "rewrites": 1
+  },
+  "area_proxy_reduction_vs_baseline_percent": 50.0
+}

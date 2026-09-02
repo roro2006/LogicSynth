@@ -14,9 +14,10 @@ implementation path, avoiding semantic drift between wrappers.
 
 For every module, the analyzer builds a driver map and a directed cell graph.
 It reports cell and edge counts, fanout, maximum topological depth, per-gate
-counts, an area proxy, and an activity-weighted power proxy. The depth metric is
-deliberately conservative: it counts logic levels rather than claiming a
-technology-specific delay.
+counts, an area proxy, and an activity-weighted power proxy. The native pass
+builds a directed driver-to-consumer graph and computes topological depth and
+fanout pressure from actual signal connections rather than using total cell
+count as a timing surrogate.
 
 ## Rewrite layer
 
