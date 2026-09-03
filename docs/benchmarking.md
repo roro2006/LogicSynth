@@ -30,6 +30,12 @@ smoke benchmark compares baseline Yosys, Yosys+ABC, and native LogicSynth in
 machine-readable JSON; on the commutative-cone fixture LogicSynth reduces the
 raw two-cell baseline to one cell while the equivalence gate passes.
 
+`results/arbiter.summary.json` records a completed public benchmark at the
+pinned revision. On that design, LogicSynth reduced the baseline cell count by
+4.19% and the ABC cell count by 1.55%; the result also records the significant
+runtime cost of the current heuristic implementation, so the QoR claim is not
+presented without its reproducibility tradeoff.
+
 ## Interpreting results
 
 `area_proxy` and `power_proxy` are structural indicators. They are useful for

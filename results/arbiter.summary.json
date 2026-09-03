@@ -1,0 +1,40 @@
+{
+  "design": "random_control/arbiter.v",
+  "source": {
+    "url": "https://github.com/lsils/benchmarks.git",
+    "revision": "82d8cc6910419298e713a46644ed59fd3df53038"
+  },
+  "top": "top",
+  "yosys_version": "Yosys 0.33 (git sha1 2584903a060)",
+  "profile": "balanced",
+  "equivalence": "passed",
+  "flows": {
+    "baseline": {
+      "num_cells": 23873,
+      "num_cells_by_type": {
+        "$and": 11838,
+        "$not": 12034,
+        "$or": 1
+      },
+      "runtime_ms": 1606
+    },
+    "abc": {
+      "num_cells": 23233,
+      "num_cells_by_type": {
+        "$and": 11838,
+        "$not": 11394,
+        "$or": 1
+      },
+      "runtime_ms": 6233
+    },
+    "logicsynth": {
+      "num_cells": 22873,
+      "num_cells_by_type": {
+        "$and": 11308,
+        "$not": 11564,
+        "$or": 1
+      },
+      "runtime_ms": 550947
+    }
+  }
+}
