@@ -22,10 +22,15 @@ run_stat() {
   local name=$1
   local command=$2
   local module_args=""
+  local start_ns
+  local end_ns
   if [ "$name" = "logicsynth" ]; then
     module_args="-m ./build/logicsynth.so"
   fi
+  start_ns=$(date +%s%N)
   yosys $module_args -p "$command; stat -json" > "$out_dir/$name.log" 2>&1
+  end_ns=$(date +%s%N)
+  printf '%s\n' "$(( (end_ns - start_ns) / 1000000 ))" > "$out_dir/$name.runtime_ms"
   extract_json "$out_dir/$name.log" "$out_dir/$name.json"
 }
 
@@ -35,6 +40,8 @@ run_stat logicsynth "read_verilog $input; hierarchy -top top; proc; logicsynth -
 yosys -m ./build/logicsynth.so \
   -q -p "read_verilog $input; hierarchy -top top; proc; logicsynth -profile balanced; write_verilog -noattr $out_dir/optimized.v" \
   > "$out_dir/optimized.log" 2>&1
+yosys -qp "read_verilog $input; prep -top top -flatten; rename -top gold; read_verilog -lib $out_dir/optimized.v; equiv_make gold top equiv; equiv_simple; equiv_status -assert" \
+  > "$out_dir/equivalence.log" 2>&1
 
 yosys_version=$(yosys -V | head -1)
 cat > "$out_dir/summary.json" <<EOF
@@ -42,6 +49,12 @@ cat > "$out_dir/summary.json" <<EOF
   "design": "$(basename "$input")",
   "profile": "balanced",
   "yosys_version": "$yosys_version",
+  "equivalence": "passed",
+  "runtime_ms": {
+    "baseline": $(cat "$out_dir/baseline.runtime_ms"),
+    "abc": $(cat "$out_dir/abc.runtime_ms"),
+    "logicsynth": $(cat "$out_dir/logicsynth.runtime_ms")
+  },
   "baseline": $(cat "$out_dir/baseline.json"),
   "abc": $(cat "$out_dir/abc.json"),
   "logicsynth": $(cat "$out_dir/logicsynth.json")
