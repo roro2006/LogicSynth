@@ -40,6 +40,8 @@ struct Profile {
 struct Report {
   std::size_t rewrites = 0;
   Metrics metrics;
+  double objective_before = 0.0;
+  double objective_after = 0.0;
 };
 
 Metrics analyze(const Module &module);

@@ -39,7 +39,10 @@ timing favors fewer levels; power favors lower activity-weighted fanout. These
 are proxies, not signoff numbers. The expected tradeoff is that timing-oriented
 rewrites may duplicate logic while area-oriented sharing may increase fanout.
 The benchmark report should therefore publish all three dimensions rather than
-one composite score.
+one composite score. The C++ optimizer now computes the weighted objective for
+each candidate rewrite and rejects candidates that regress it. Reports retain
+the objective before and after optimization, making profile behavior observable
+in tests and benchmark output.
 
 ## Correctness boundary
 
