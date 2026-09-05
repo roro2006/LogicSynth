@@ -57,6 +57,20 @@ implements the same deterministic duplicate-cone rewrite and structural
 metrics. The next integration step is a Yosys JSON adapter or native Yosys
 plugin, depending on the target deployment.
 
+## Yosys integration test
+
+With Yosys installed, the complete flow can be exercised using the checked-in
+fixture:
+
+```bash
+make yosys-test
+```
+
+This exports a baseline JSON netlist, runs the configured LogicSynth profile,
+imports the optimized JSON, emits Verilog, and runs Yosys formal equivalence.
+CI installs a pinned Ubuntu-package Yosys dependency and executes this flow on
+every push and pull request.
+
 The optimizer currently targets combinational `$logic` cells and preserves
 unknown cells and sequential behavior. Run `scripts/equivalence.sh` with Yosys
 installed to compare the original and optimized Verilog.

@@ -1,0 +1,45 @@
+{
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "profile": {
+    "area_weight": 1.0,
+    "delay_weight": 1.0,
+    "power_weight": 1.0
+  },
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "records": [
+    {
+      "after": {
+        "top": {
+          "area_proxy": 1,
+          "cells": 1,
+          "edges": 0,
+          "fanout_max": 0,
+          "gate_counts": {
+            "$and": 1
+          },
+          "logic_cells": 1,
+          "max_depth": 0,
+          "power_proxy": 1
+        }
+      },
+      "before": {
+        "top": {
+          "area_proxy": 2,
+          "cells": 2,
+          "edges": 1,
+          "fanout_max": 1,
+          "gate_counts": {
+            "$and": 2
+          },
+          "logic_cells": 2,
+          "max_depth": 1,
+          "power_proxy": 4
+        }
+      },
+      "design": "tiny.json",
+      "rewrites": 1,
+      "runtime_ms": 0.144
+    }
+  ],
+  "tool": "LogicSynth"
+}
