@@ -87,6 +87,12 @@ The plugin is intentionally conservative and currently implements duplicate
 combinational-cone sharing. It is the first native integration point for
 bringing the C++ implementation into the Yosys pass pipeline.
 
+Python is not the production pass. It remains in the repository as a small
+reference implementation for JSON experiments and the benchmark harness.
+Production Yosys integration is C++ through `passes/logicsynth.cc`; `make test`
+keeps both implementations covered so the reference path cannot silently
+diverge from the native path.
+
 The optimizer currently targets combinational `$logic` cells and preserves
 unknown cells and sequential behavior. Run `scripts/equivalence.sh` with Yosys
 installed to compare the original and optimized Verilog.

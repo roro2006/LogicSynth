@@ -3,7 +3,7 @@ on:
   push:
   pull_request:
 jobs:
-  python:
+  build-and-integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,4 +15,6 @@ jobs:
       - run: make test
       - run: make yosys-test
       - run: make yosys-plugin
+        name: Build native C++ Yosys plugin
       - run: make yosys-plugin-test
+        name: Test native C++ Yosys plugin
