@@ -14,3 +14,7 @@ jobs:
         name: Build native C++ Yosys plugin
       - run: make yosys-plugin-test
         name: Test native C++ Yosys plugin
+      - run: make benchmark
+        name: Generate native QoR comparison
+      - run: test -s results/native/summary.json
+        name: Validate machine-readable benchmark result

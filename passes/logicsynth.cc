@@ -7,7 +7,7 @@
  */
 #include "kernel/yosys.h"
 
-#include <cmath>
+#include <algorithm>
 #include <map>
 
 USING_YOSYS_NAMESPACE
@@ -74,6 +74,7 @@ struct LogicSynthPass : public Pass {
       size_t rejected = 0;
       const auto before = metrics(module);
       const double objective_before = objective(before, area_weight, delay_weight, power_weight);
+      double current_objective = objective_before;
       for (auto it = module->cells_.begin();
            it != module->cells_.end() && rewrites < max_rewrites;) {
         RTLIL::Cell *cell = it->second;
@@ -90,10 +91,19 @@ struct LogicSynthPass : public Pass {
         }
         RTLIL::SigSpec replacement;
         if (identity_replacement(cell, replacement)) {
+          const auto candidate = candidate_metrics(module, cell);
+          const double candidate_objective =
+              objective(candidate, area_weight, delay_weight, power_weight);
+          if (candidate_objective > current_objective) {
+            ++rejected;
+            ++it;
+            continue;
+          }
           module->connect(output, replacement);
           module->remove(cell);
           it = module->cells_.begin();
           ++rewrites;
+          current_objective = objective(metrics(module), area_weight, delay_weight, power_weight);
           continue;
         }
 
@@ -131,9 +141,10 @@ struct LogicSynthPass : public Pass {
           ++it;
           continue;
         }
-        const auto after = candidate_metrics(module, cell);
-        const double objective_after = objective(after, area_weight, delay_weight, power_weight);
-        if (objective_after > objective_before) {
+        const auto candidate = candidate_metrics(module, cell);
+        const double candidate_objective =
+            objective(candidate, area_weight, delay_weight, power_weight);
+        if (candidate_objective > current_objective) {
           ++rejected;
           ++it;
           continue;
@@ -142,6 +153,7 @@ struct LogicSynthPass : public Pass {
         module->remove(cell);
         it = module->cells_.begin();
         ++rewrites;
+        current_objective = objective(metrics(module), area_weight, delay_weight, power_weight);
       }
       const auto final_metrics = metrics(module);
       log("  %s: rewrites=%zu rejected=%zu area=%zu depth=%zu power_proxy=%zu objective_before=%.3f objective_after=%.3f\n",
@@ -154,17 +166,49 @@ struct LogicSynthPass : public Pass {
 private:
   static Metrics metrics(RTLIL::Module *module) {
     Metrics result;
-    std::map<std::string, size_t> fanout;
+    std::map<std::string, RTLIL::Cell *> drivers;
+    std::map<std::string, std::set<std::string>> edges;
+    std::map<std::string, size_t> indegree;
+    std::map<std::string, size_t> depth;
     for (const auto &entry : module->cells_) {
+      indegree[entry.first.str()] = 0;
       if (is_logic(entry.second->type))
         ++result.logic_cells;
       for (const auto &connection : entry.second->connections()) {
-        if (connection.first == ID::Y || connection.first == ID::Q)
-          continue;
-        fanout[connection.second.as_string()]++;
+        if (connection.first == ID::Y || connection.first == ID::Q) {
+          for (const auto &bit : connection.second)
+            drivers[RTLIL::SigSpec(bit).as_string()] = entry.second;
+        }
       }
     }
-    result.max_depth = result.logic_cells;
+    std::map<std::string, size_t> fanout;
+    for (const auto &entry : module->cells_) {
+      for (const auto &connection : entry.second->connections()) {
+        if (connection.first == ID::Y || connection.first == ID::Q)
+          continue;
+        for (const auto &bit : connection.second) {
+          const auto driver = drivers.find(RTLIL::SigSpec(bit).as_string());
+          if (driver != drivers.end() && driver->second != entry.second &&
+              edges[driver->second->name.str()].insert(entry.first.str()).second) {
+            ++indegree[entry.first.str()];
+            ++fanout[driver->second->name.str()];
+          }
+        }
+      }
+    }
+    std::deque<std::string> ready;
+    for (const auto &entry : indegree)
+      if (entry.second == 0) ready.push_back(entry.first);
+    while (!ready.empty()) {
+      const auto source = ready.front();
+      ready.pop_front();
+      for (const auto &target : edges[source]) {
+        depth[target] = std::max(depth[target], depth[source] + 1);
+        if (--indegree[target] == 0) ready.push_back(target);
+      }
+    }
+    for (const auto &entry : depth)
+      result.max_depth = std::max(result.max_depth, entry.second);
     for (const auto &entry : fanout)
       result.fanout_proxy += entry.second * entry.second;
     return result;
@@ -174,7 +218,6 @@ private:
     Metrics result = metrics(module);
     if (is_logic(removed->type) && result.logic_cells > 0)
       --result.logic_cells;
-    result.max_depth = result.logic_cells;
     return result;
   }
 

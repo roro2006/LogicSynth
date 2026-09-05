@@ -1,0 +1,3 @@
+# name	source_url	revision	relative_path	top	license
+lsils-random-control	https://github.com/lsils/benchmarks.git	82d8cc6910419298e713a46644ed59fd3df53038	random_control/arbiter.v	top	BSD-style repository license
+lsils-random-control	https://github.com/lsils/benchmarks.git	82d8cc6910419298e713a46644ed59fd3df53038	random_control/priority.v	top	BSD-style repository license

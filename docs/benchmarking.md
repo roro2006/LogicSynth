@@ -8,10 +8,10 @@ rewrite budget, input checksum, runtime, and raw JSON metrics.
 
 1. Obtain a public RTL design and record its source URL and license.
 2. Run the baseline Yosys script with fixed top-module and ABC options.
-3. Export `baseline.json`, run LogicSynth, and re-import the optimized JSON.
+3. Export baseline statistics, run LogicSynth, and re-import the optimized Verilog.
 4. Run the same mapping and metric collection on both designs.
 5. Run formal equivalence and retain the command output.
-6. Store one JSON record per design under `results/`; generate tables or plots
+6. Store raw JSON statistics and one summary record per design under `results/`; generate tables or plots
    from those records without hand-editing values.
 
 For the checked-in smoke fixture, `make benchmark` writes native Yosys logs and
@@ -22,6 +22,13 @@ The supplied harness works on an existing directory of Yosys JSON files, which
 keeps CI offline and avoids silently changing a benchmark when an upstream
 repository moves. Public benchmark acquisition belongs in a pinned manifest
 with checksums when a study is published.
+
+`benchmarks/manifest.tsv` pins two public RTL inputs from the LSILS benchmark
+repository to an immutable revision. Run `make fetch-benchmarks` to obtain
+those sources, then invoke `scripts/benchmark_native.sh` for each input. The
+smoke benchmark compares baseline Yosys, Yosys+ABC, and native LogicSynth in
+machine-readable JSON; on the commutative-cone fixture LogicSynth reduces the
+raw two-cell baseline to one cell while the equivalence gate passes.
 
 ## Interpreting results
 
