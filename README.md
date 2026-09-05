@@ -23,7 +23,7 @@ It is an attempt to make the entire optimization experiment inspectable:
 where the pass sits in the flow, what it considers a candidate, why it accepts
 or rejects a rewrite, and what the measured tradeoff actually was.
 
-## The first decision: build a pass, not another disconnected tool
+## The first decision: build an overarching pass
 
 The first version of the project was a JSON-netlist prototype. That was a good
 place to test the basic idea. It was also a useful warning.
