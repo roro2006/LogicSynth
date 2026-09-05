@@ -98,10 +98,20 @@ struct LogicSynthPass : public Pass {
         }
 
         std::string key = cell->type.str();
+        std::vector<std::string> commutative_inputs;
         for (const auto &port : cell->connections()) {
           if (port.first == ID::Y || port.first == ID::Q)
             continue;
-          key += "|" + port.first.str() + ":" + port.second.as_string();
+          const auto encoded = port.second.as_string();
+          if (is_commutative(cell->type) && (port.first == ID::A || port.first == ID::B))
+            commutative_inputs.push_back(encoded);
+          else
+            key += "|" + port.first.str() + ":" + encoded;
+        }
+        if (is_commutative(cell->type)) {
+          std::sort(commutative_inputs.begin(), commutative_inputs.end());
+          for (const auto &encoded : commutative_inputs)
+            key += "|I:" + encoded;
         }
 
         auto prior = canonical.find(key);
@@ -208,6 +218,12 @@ private:
     return name == "$and" || name == "$or" || name == "$xor" ||
            name == "$xnor" || name == "$not" || name == "$mux" ||
            name == "$_AND_" || name == "$_OR_";
+  }
+
+  static bool is_commutative(const RTLIL::IdString &type) {
+    const auto name = type.str();
+    return name == "$and" || name == "$or" || name == "$xor" ||
+           name == "$xnor" || name == "$_AND_" || name == "$_OR_";
   }
 };
 

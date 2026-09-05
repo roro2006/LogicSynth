@@ -23,3 +23,9 @@ yosys -m ./build/logicsynth.so \
   > build/identity.log
 grep -q "rewrites=3 rejected=0" build/identity.log
 scripts/equivalence.sh tests/data/identity_rewrites.v build/identity.v top
+
+yosys -m ./build/logicsynth.so \
+  -p 'read_verilog tests/data/commutative_cones.v; hierarchy -top top; logicsynth; write_verilog -noattr build/commutative.v' \
+  > build/commutative.log
+grep -q "rewrites=1 rejected=0" build/commutative.log
+scripts/equivalence.sh tests/data/commutative_cones.v build/commutative.v top
