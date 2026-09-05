@@ -17,3 +17,9 @@ yosys -m ./build/logicsynth.so \
   -p 'read_verilog tests/data/native_edge_cases.v; hierarchy -top top; proc; logicsynth -profile power; write_verilog build/native-edge.v' \
   > build/native-edge.log
 grep -q "rewrites=1 rejected=0" build/native-edge.log
+
+yosys -m ./build/logicsynth.so \
+  -p 'read_verilog tests/data/identity_rewrites.v; hierarchy -top top; logicsynth; write_verilog -noattr build/identity.v' \
+  > build/identity.log
+grep -q "rewrites=3 rejected=0" build/identity.log
+scripts/equivalence.sh tests/data/identity_rewrites.v build/identity.v top

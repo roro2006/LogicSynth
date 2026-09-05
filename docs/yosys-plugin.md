@@ -25,3 +25,6 @@ It excludes sequential and unknown cell types. Each module reports area, depth,
 fanout-based power proxy, weighted objective before/after, and rejected
 candidates. Formal equivalence remains the acceptance gate; use
 `scripts/equivalence.sh` for a complete automated check.
+
+The native smoke suite also covers constant identities such as `x & 1`,
+`x | 0`, and `x ^ 0`, then proves the emitted Verilog equivalent to the input.

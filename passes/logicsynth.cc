@@ -88,6 +88,14 @@ struct LogicSynthPass : public Pass {
           ++it;
           continue;
         }
+        RTLIL::SigSpec replacement;
+        if (identity_replacement(cell, replacement)) {
+          module->connect(output, replacement);
+          module->remove(cell);
+          it = module->cells_.begin();
+          ++rewrites;
+          continue;
+        }
 
         std::string key = cell->type.str();
         for (const auto &port : cell->connections()) {
@@ -165,6 +173,34 @@ private:
     return area_weight * metrics.logic_cells +
            delay_weight * metrics.max_depth +
            power_weight * metrics.fanout_proxy;
+  }
+
+  static bool identity_replacement(RTLIL::Cell *cell, RTLIL::SigSpec &replacement) {
+    const auto type = cell->type.str();
+    if (type != "$and" && type != "$or" && type != "$xor" && type != "$xnor")
+      return false;
+    const auto a = cell->getPort(ID::A);
+    const auto b = cell->getPort(ID::B);
+    if (a.size() != 1 || b.size() != 1)
+      return false;
+    const auto neutral = [](const RTLIL::SigSpec &signal, bool &value) {
+      if (!signal.is_fully_const())
+        return false;
+      value = signal.as_bool();
+      return true;
+    };
+    bool a_value = false, b_value = false;
+    const bool a_const = neutral(a, a_value);
+    const bool b_const = neutral(b, b_value);
+    if (type == "$and" && a_const && a_value) { replacement = b; return true; }
+    if (type == "$and" && b_const && b_value) { replacement = a; return true; }
+    if (type == "$or" && a_const && !a_value) { replacement = b; return true; }
+    if (type == "$or" && b_const && !b_value) { replacement = a; return true; }
+    if (type == "$xor" && a_const && !a_value) { replacement = b; return true; }
+    if (type == "$xor" && b_const && !b_value) { replacement = a; return true; }
+    if (type == "$xnor" && a_const && !a_value) { replacement = b; return true; }
+    if (type == "$xnor" && b_const && !b_value) { replacement = a; return true; }
+    return false;
   }
 
   static bool is_logic(const RTLIL::IdString &type) {
