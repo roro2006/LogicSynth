@@ -8,7 +8,6 @@ build:
 
 test: build
 	ctest --test-dir build --output-on-failure
-	PYTHONPATH=src python3 -m pytest -q
 
 yosys-test:
 	bash tests/integration_yosys.sh
@@ -24,7 +23,7 @@ yosys-plugin-test:
 	bash tests/native_yosys_plugin.sh
 
 benchmark:
-	PYTHONPATH=src python3 scripts/benchmark.py tests/data results/latest.json
+	bash scripts/benchmark_native.sh tests/data/duplicate_cone.v
 
 clean:
 	rm -rf build

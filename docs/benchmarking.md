@@ -1,7 +1,7 @@
 # Reproducible benchmarking
 
 Benchmarks should be treated like an experiment, not a screenshot. Record the
-repository revision, Python version, Yosys/ABC versions, host, profile, weights,
+repository revision, compiler version, Yosys/ABC versions, host, profile, weights,
 rewrite budget, input checksum, runtime, and raw JSON metrics.
 
 ## Method
@@ -14,11 +14,9 @@ rewrite budget, input checksum, runtime, and raw JSON metrics.
 6. Store one JSON record per design under `results/`; generate tables or plots
    from those records without hand-editing values.
 
-For the checked-in smoke fixture, `make benchmark` writes
-`results/latest.json`. The Yosys integration flow is intentionally separate:
-`make yosys-test` proves that the optimized interchange file can be re-imported
-and remains equivalent, while the benchmark harness measures the structural
-proxies.
+For the checked-in smoke fixture, `make benchmark` writes native Yosys logs and
+the optimized Verilog under `results/native/`. `make yosys-test` additionally
+proves formal equivalence of the optimized output.
 
 The supplied harness works on an existing directory of Yosys JSON files, which
 keeps CI offline and avoids silently changing a benchmark when an upstream
