@@ -21,5 +21,7 @@ make yosys-plugin-test
 The plugin accepts `-profile balanced|area|timing|power`, explicit
 `-area_weight`, `-delay_weight`, and `-power_weight` overrides, plus
 `-max_rewrites N`. It visits selected modules in deterministic cell-map order.
-It excludes sequential and unknown cell types. Formal equivalence remains the acceptance gate; use
+It excludes sequential and unknown cell types. Each module reports area, depth,
+fanout-based power proxy, weighted objective before/after, and rejected
+candidates. Formal equivalence remains the acceptance gate; use
 `scripts/equivalence.sh` for a complete automated check.
