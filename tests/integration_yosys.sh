@@ -8,4 +8,4 @@ fi
 
 rm -rf build/yosys-test
 scripts/yosys_flow.sh tests/data/duplicate_cone.v top build/yosys-test
-grep -q "duplicate cones shared" build/yosys-test/optimization.log
+grep -q "rewrites=1 rejected=0" build/yosys-test/optimization.log
