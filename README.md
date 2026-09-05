@@ -80,7 +80,7 @@ as a native pass:
 
 ```bash
 make yosys-plugin
-yosys -m ./build/logicsynth.so -p 'read_verilog design.v; prep -top top; logicsynth; write_verilog optimized.v'
+yosys -m ./build/logicsynth.so -p 'read_verilog design.v; prep -top top; logicsynth -profile balanced; write_verilog optimized.v'
 ```
 
 The plugin is intentionally conservative and currently implements duplicate
