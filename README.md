@@ -1,40 +1,20 @@
-# Building LogicSynth: A Small Optimization Pass That Has to Earn Trust
+# Building LogicSynth
 
-*September 2026*
+Logic synthesis has a deceptively simple sales pitch: start with a description of a digital circuit and produce a better one.
 
-Logic synthesis has a deceptively simple sales pitch: take a description of a
-digital circuit and produce a better one.
+The uncomfortable word in that sentence is *better*. Fewer cells is usually good, until the rewrite lengthens a critical path. Sharing logic can reduce area, until the shared signal creates enough fanout to be a liability. A Boolean identity can be true on paper and still be wrong to apply to a bus, a sequential element, or a signal form the pass did not account for. And after a transformation seems reasonable, there is still the basic question: does the new netlist compute the same design?
 
-“Better” is where the trouble starts.
+I built LogicSynth to make that whole loop visible. It is a small native C++ optimization pass for Yosys that applies a deliberately limited set of structural rewrites, scores them using an explicit objective, and checks the result with formal equivalence.
 
-Fewer gates is usually good, until the rewrite creates a long critical path.
-Sharing logic can reduce area, until the shared signal acquires a fanout that
-hurts power. A Boolean identity can be true on paper, yet still be applied to
-the wrong width or the wrong kind of signal. And even when the optimized
-netlist looks reasonable, how do we know it still computes the same circuit?
+This is not an attempt to replace ABC with a few hundred lines of heuristics. The useful part of the project is that the experiment is inspectable: the candidate rewrites are small, the cost model is stated, the boundary conditions are explicit, and the result is checked rather than assumed.
 
-I built LogicSynth to explore that problem in the open: a small, native C++
-optimization pass that runs inside Yosys, makes a limited set of explainable
-rewrites, scores them against an explicit objective, and submits the result to
-formal equivalence checking.
+## Starting with the wrong boundary
 
-This is not a claim that a few hundred lines of heuristics have replaced ABC.
-It is an attempt to make the entire optimization experiment inspectable:
-where the pass sits in the flow, what it considers a candidate, why it accepts
-or rejects a rewrite, and what the measured tradeoff actually was.
+The first version worked on Yosys JSON netlists. That was a reasonable way to test the basic idea. It was also a good way to discover what I did not want the final project to be.
 
-## The first decision: build a pass, not another disconnected tool
+A program that reads a serialized netlist, changes it, and writes it back has a second representation boundary and a second set of assumptions about signals and cells. It is easy to make a prototype look convincing there, because the awkward parts have been pushed outside the program.
 
-The first version of the project was a JSON-netlist prototype. That was a good
-place to test the basic idea. It was also a useful warning.
-
-A Python program that reads a serialized netlist and writes another one is easy
-to demonstrate, but it is not quite the tool I wanted an EDA engineer to
-adopt. It introduces a representation boundary, a separate runtime, and a
-second set of assumptions about how Yosys signals and cells are represented.
-
-So I moved the production path into C++ and made RTLIL the integration
-boundary. The pass is loaded as a native Yosys plugin:
+I eventually moved the optimization path into C++ and made RTLIL the boundary instead. The pass is built as a native Yosys plugin:
 
 ```bash
 make yosys-plugin
@@ -42,35 +22,24 @@ yosys -m ./build/logicsynth.so \
   -p 'read_verilog design.v; prep -top top; logicsynth -profile balanced; write_verilog optimized.v'
 ```
 
-That choice had an important consequence. The pass could no longer pretend
-that a netlist was just a convenient dictionary of nodes. It had to deal with
-real signal widths, constants, buses, sequential cells, blackboxes, and the
-details of Yosys's RTLIL data model.
+That change made the project less convenient in the short term. It also meant the optimizer had to deal with the objects that occur in an actual Yosys flow: widths, constants, buses, sequential cells, blackboxes, and RTLIL's representation of connections.
 
-The resulting repository is C++-only in the optimization flow. The reusable
-core lives under `include/` and `src/cpp/`; the production Yosys entry point is
-`passes/logicsynth.cc`.
+The reusable C++ core lives in `include/` and `src/cpp/`. The production Yosys entry point is `passes/logicsynth.cc`.
 
-## What counts as an improvement?
+## The first useful rewrites
 
-The obvious first objective is area. If two cells compute the same operation,
-keep one and redirect the users of the other. That is the first rewrite
-LogicSynth learned: duplicate-cone sharing.
+The first rewrite LogicSynth learned was duplicate-cone sharing. If two cells compute the same operation on the same inputs, the pass can keep one and redirect users of the other. This is small, deterministic, and easy to test.
 
-It is small, deterministic, and easy to reason about. It is also more
-interesting than it sounds, because commutativity matters. These two cones
-should match:
+It is also a little less trivial than it first appears. Consider:
 
 ```text
 a & b
 b & a
 ```
 
-LogicSynth canonicalizes the operands of commutative operations before
-comparing them. Once that was in place, the pass could find sharing that a
-literal operand-order comparison would miss.
+Those cones should match, even though their operands arrive in a different order. LogicSynth canonicalizes operands of commutative operations before comparing cones. Without that step, the pass only recognizes sharing when the source happens to use the same ordering.
 
-The next step was a handful of Boolean identities:
+The next set of rewrites came from basic Boolean identities:
 
 ```text
 x & 1     = x
@@ -80,64 +49,39 @@ x XNOR 1  = x
 x XNOR 0  = NOT x
 ```
 
-The last line became an unexpectedly valuable test of the development
-process. An earlier implementation treated `x XNOR 0` as `x`. That is wrong:
-XNOR with zero is inversion. The mistake was not found by looking at a cell
-count. It was found by exercising the fixture through formal equivalence.
+The last one was more useful as a debugging lesson than as an optimization. An earlier version handled `x XNOR 0` as `x`. It should have produced the inverse of `x`. Cell counts did not reveal that mistake; formal equivalence did.
 
-That changed how I thought about the pass. Correctness was not something to
-check after the “real” work. It had to shape the rewrite design from the
-beginning.
+That changed how I approached the rest of the pass. Equivalence checking was not a final checkbox after the optimization work. It had to be part of how the rewrites were designed and tested.
 
-## Turning a gate counter into an objective
+## Deciding what “better” means
 
-A rewrite that removes a cell is not automatically a good rewrite. LogicSynth
-therefore evaluates candidates against a weighted structural objective:
+Removing a cell is not automatically an improvement. LogicSynth ranks candidates with a weighted structural objective that combines:
 
-- **area:** logic-cell count;
-- **delay:** directed graph depth through combinational logic;
-- **power proxy:** fanout pressure, with high fanout penalized more heavily.
+- **Area:** logic-cell count
+- **Delay proxy:** directed depth through combinational logic
+- **Power proxy:** fanout pressure, with higher fanout receiving a larger penalty
 
-The pass has four named profiles:
+The pass has four built-in profiles: `balanced`, `area`, `timing`, and `power`. The weights can also be supplied explicitly with options such as `area_weight`, `delay_weight`, `power_weight`, and `max_rewrites`.
 
-```text
-balanced
-area
-timing
-power
-```
+The graph analysis builds driver-to-consumer edges from RTLIL connections, computes combinational depth, and accumulates fanout pressure. It is intentionally a rough structural model. It is not static timing analysis, library mapping, switching simulation, or signoff power analysis.
 
-The weights can also be supplied explicitly with options such as
-`area_weight`, `delay_weight`, `power_weight`, and `max_rewrites`.
+That distinction is important enough to say plainly: these metrics are ranking signals for early decisions. They are not timing or power numbers.
 
-The graph analysis builds driver-to-consumer edges from RTLIL connections,
-computes topological depth, and accumulates fanout pressure. This is not
-signoff timing or switching simulation. It is an intentionally modest model
-for making early structural choices consistently.
+## Being conservative on purpose
 
-That distinction matters. A proxy is useful when it is described honestly. It
-becomes misleading when it is presented as a timing report or a power number.
-LogicSynth reports these metrics as ranking signals, not as a replacement for
-STA, library mapping, or activity-based power analysis.
+The pass does not rewrite every cell that looks vaguely Boolean. It recognizes a narrow set of combinational cells and treats sequential, unknown, and blackbox cells as boundaries.
 
-## The safety boundary is part of the design
+The fixture set covers:
 
-The pass does not try to rewrite everything that looks like logic. It
-recognizes a deliberately limited set of combinational cells and treats
-sequential and unknown cells as boundaries.
+- AND, OR, XOR, and XNOR constant identities
+- Duplicate cones with commuted operands
+- Buses and multi-bit signals
+- Muxes
+- Sequential logic
+- Unknown and blackbox cells
+- Corner cases in RTLIL signal forms
 
-The test fixtures cover:
-
-- AND, OR, XOR, and XNOR constant identities;
-- commutative duplicate cones;
-- buses and multi-bit signals;
-- muxes;
-- sequential logic;
-- unknown and blackbox cells;
-- corner-case RTLIL signal forms.
-
-For each flow, Yosys keeps the original design as a gold module, loads the
-optimized design separately, constructs an equivalence module, and runs:
+For the integration flow, Yosys keeps the original design as a gold module, loads the optimized design separately, constructs an equivalence module, and runs:
 
 ```text
 equiv_make
@@ -145,10 +89,9 @@ equiv_simple
 equiv_status -assert
 ```
 
-This caught the XNOR bug. It also gives the project a much stronger safety
-story than “the optimized Verilog compiled.”
+This is how the XNOR bug was caught. It is also a more meaningful claim of safety than saying that the emitted Verilog compiled.
 
-The local checks are intentionally straightforward:
+The local checks are deliberately uncomplicated:
 
 ```bash
 make test
@@ -156,50 +99,33 @@ make yosys-test
 make yosys-plugin-test
 ```
 
-The C++ unit tests check the reusable core. The Yosys fixtures check the actual
-plugin boundary. Formal equivalence checks whether the transformation
-preserved behavior.
+The C++ tests cover the reusable optimization core. The Yosys fixtures exercise the plugin boundary. The equivalence flow checks whether the transformed design still behaves like the original.
 
-## The benchmark question
+## The benchmark that made the tradeoff obvious
 
-At some point, a synthesis project has to stop describing potential and show
-measurements. I wanted the benchmark harness to make it difficult to cherry
-pick a flattering result.
+At some point, a synthesis project needs a result that is less tidy than a hand-built test case. I wanted the benchmark harness to make it hard to keep only the flattering part of a run.
 
-The harness runs three flows on the same input:
+For a given input, it runs three flows:
 
-1. baseline Yosys;
-2. Yosys with ABC;
-3. native LogicSynth.
+- Baseline Yosys
+- Yosys with ABC
+- Native LogicSynth
 
-It records raw Yosys JSON statistics, runtime, the tool version, the selected
-profile, and equivalence status. Public inputs are pinned to an immutable
-revision in `benchmarks/manifest.tsv`.
+It records Yosys JSON statistics, runtime, tool version, selected profile, and equivalence status. Public inputs are pinned to an immutable revision in `benchmarks/manifest.tsv`.
 
-The first public design I ran was
-`random_control/arbiter.v` from the LSILS benchmark repository. The completed
-run used Yosys 0.33 and produced this comparison:
+The first public design I ran was `random_control/arbiter.v` from the LSILS benchmark repository. With Yosys 0.33, the run produced:
 
 | Flow | Cells | Runtime |
-| --- | ---: | ---: |
+|---|---:|---:|
 | Baseline Yosys | 23,873 | 1.6 s |
 | Yosys + ABC | 23,233 | 6.2 s |
 | LogicSynth | 22,873 | 550.9 s |
 
-LogicSynth removed 1,000 cells relative to the baseline, a 4.19% reduction.
-It also removed 360 cells relative to ABC, a 1.55% reduction. Formal
-equivalence passed.
+LogicSynth removed 1,000 cells relative to baseline, a 4.19% reduction, and 360 relative to the ABC flow, a 1.55% reduction. The equivalence check passed.
 
-The runtime is the part that is easiest to hide and most important to show.
-The current LogicSynth run took about nine minutes, compared with seconds for
-the established flows. The result is therefore a useful QoR data point, not a
-victory lap. The implementation found a measurable structural improvement,
-but its candidate analysis is not yet fast enough for a fair production
-replacement claim.
+The runtime belongs next to those numbers. The current LogicSynth run takes roughly nine minutes while the established flows take seconds. This is a QoR observation, not evidence that the pass is ready to replace a production optimizer. The pass found a measurable structural reduction, but its candidate analysis is still too expensive for that claim.
 
-The result is checked in as
-[`results/arbiter.summary.json`](results/arbiter.summary.json). Reproduce the
-public checkout and run with:
+The checked-in summary is [`results/arbiter.summary.json`](results/arbiter.summary.json). To reproduce the public checkout and run:
 
 ```bash
 make fetch-benchmarks
@@ -208,27 +134,20 @@ scripts/benchmark_native.sh \
   build/public-arbiter
 ```
 
-There is also a small commutative-cone smoke result. It reduces a two-cell
-baseline to one cell and passes equivalence. It is useful because the example
-is easy to understand; the arbiter result is useful because it is a public
-design with a less toy-like cone structure.
+There is also a commutative-cone smoke result. It reduces a two-cell baseline to one cell and passes equivalence. That example is useful because it is easy to inspect; the arbiter run is useful because it is a public design with a less toy-like cone structure.
 
-## What I learned from the implementation
+## What the implementation taught me
 
-The biggest lesson was that an optimization pass is mostly a trust-building
-exercise.
+The rewrite rules are usually not the hard part. The surrounding questions are.
 
-The rewrite itself is often the easy part. The difficult questions are:
-
-- What exactly does the pass consider a cell?
+- What, precisely, counts as a supported cell?
 - What happens when a signal is wider than one bit?
-- What happens when the operation is commutative?
-- What happens when the cell is sequential or unknown?
-- Does the objective account for the cost created by sharing?
-- Can another engineer reproduce the result without reconstructing the
-  original environment?
+- How should commutativity affect structural comparison?
+- What is the safe behavior around sequential and unknown logic?
+- Does sharing reduce one cost while creating another?
+- Can someone else reproduce both the result and the equivalence check?
 
-Those questions led directly to the current repository structure:
+Those questions shaped the repository:
 
 ```text
 include/                 C++ netlist and metric types
@@ -242,34 +161,26 @@ docs/                    Architecture and methodology
 .github/workflows/       Build and integration CI
 ```
 
-They also explain why the project is conservative. A pass that changes fewer
-things but can explain and verify those changes is a better foundation than a
-larger collection of clever rewrites that nobody can audit.
+That is also why the pass is conservative. A smaller collection of transformations that can be explained, tested, and proven is a better starting point than a larger collection of opaque rewrites.
 
-## What this project is—and is not
+## Scope and next steps
 
-LogicSynth is a native, deterministic Yosys optimization pass and a
-reproducible experiment around it. It is useful for exploring structural
-rewriting, objective tradeoffs, and formal-equivalence-guarded optimization.
+LogicSynth is a deterministic native Yosys optimization pass and a reproducible experiment around it. It is useful for exploring structural rewrites, objective tradeoffs, and equivalence-checked netlist changes.
 
-It is not a replacement for ABC, a technology mapper, a signoff timing tool,
-or a power analysis tool. The public benchmark demonstrates an encouraging
-QoR result and an unacceptable runtime for many production flows. Both facts
-belong in the README.
+It is not a replacement for ABC, a technology mapper, a signoff timing tool, or an activity-based power flow. The public benchmark is encouraging on cell count and unacceptable on runtime for many production uses. Both are part of the result.
 
-The next technical steps are clear: make candidate graph updates exact rather
-than approximate, reduce the cost of cone analysis, expand the public
-benchmark set, and add more rewrite families only when they come with
-fixture-backed equivalence evidence.
+The next work is fairly concrete:
 
-That is the point of building this in the open. The interesting result is not
-that one heuristic happened to remove some cells. It is that the entire chain
-from idea to RTLIL mutation to formal proof to published JSON can be inspected,
-run, criticized, and improved.
+- Make candidate graph updates exact rather than approximate
+- Reduce the cost of cone analysis
+- Expand the public benchmark set
+- Add rewrite families only when they come with fixture-backed equivalence evidence
+
+The point of keeping the project small is that the full path—from an identity, to an RTLIL mutation, to a formal proof, to a recorded benchmark—is short enough to inspect and improve.
 
 ## Quickstart
 
-Build the C++ core and run its regression test:
+Build the C++ core and run its regression tests:
 
 ```bash
 make test
