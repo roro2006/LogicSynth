@@ -40,6 +40,23 @@ read_json build/optimized.json
 write_verilog -noattr build/optimized.v
 ```
 
+## C++ core
+
+The optimization engine is also available as a C++17 library. This is the
+preferred path for production integration and eventual native Yosys pass
+packaging; the Python implementation remains useful as a reference and
+benchmark driver while the interchange layer is expanded.
+
+```bash
+make test
+./build/logicsynth-demo
+```
+
+The current C++ core models Yosys-style cells, ports, and bit connections and
+implements the same deterministic duplicate-cone rewrite and structural
+metrics. The next integration step is a Yosys JSON adapter or native Yosys
+plugin, depending on the target deployment.
+
 The optimizer currently targets combinational `$logic` cells and preserves
 unknown cells and sequential behavior. Run `scripts/equivalence.sh` with Yosys
 installed to compare the original and optimized Verilog.
